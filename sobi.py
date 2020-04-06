@@ -46,7 +46,6 @@ def sobi_fast(X):
         encore = False
         for p in range(m-1):
             for q in range(p+1,m):
-                print('p: {}, q: {}'.format(p,q))
                 g = np.array( [ M[p,p:pm:m]-M[q,q:pm:m], 
                                M[p,q:pm:m]+M[q,p:pm:m], 
                                1j*(M[q,p:pm:m]-M[p,q:pm:m]) ] ) 

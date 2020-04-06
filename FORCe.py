@@ -61,9 +61,9 @@ def applyWaveletICA(EEGdata):
             waveData[i].append(wavePacket[n].data)
     
     mixMat, V, X = sobi_fast(np.array(waveData[0]))
-    ICs = np.transpose(V) * X
+    ICs = [np.matmul(np.transpose(V), X)]
     
-    ICs += [wp for wp in waveData[1:]]
+    ICs += [np.array(wp) for wp in waveData[1:]]
     
     return ICs, mixMat, wavePacks
 
