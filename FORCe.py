@@ -8,8 +8,10 @@ Returns:
 """
 
 import numpy as np
+from pywt import wavedec, WaveletPacket
 
 from electrode_locations import electrode_locations
+from sobi import sobi_fast
 
 import pdb 
 
@@ -44,8 +46,29 @@ def estimate_removed_channels(EEGdata, remChs, electrodes):
         
     return EEGdata
 
+def applyWaveletICA(EEGdata):
+    """ apply wavelet decomposition and ICA to EEGdata """
+    terminal_nodes = ['aa','ad','da','dd'] # labels for level 2 nodes in WaveletPacket tree
+    T = len(terminal_nodes)
+    N, _ = EEGdata.shape # no. channels
+    
+    wavePacks = []
+    waveData = [[] for i in range(T)]
+    for c in range(N):
+        wavePacket = WaveletPacket(data=EEGdata[c,:], wavelet='sym4', maxlevel=2)
+        wavePacks.append(wavePacket)
+        for i,n in enumerate(terminal_nodes):
+            waveData[i].append(wavePacket[n].data)
+    
+    mixMat, V, X = sobi_fast(np.array(waveData[0]))
+    ICs = np.transpose(V) * X
+    
+    ICs += [wp for wp in waveData[1:]]
+    
+    return ICs, mixMat, wavePacks
+
 def FORCe(EEGdata, fs, electrodes):
-    """ function to run FORCe on EEGdata """
+    """ Run FORCe on EEGdata """
     check_valid(EEGdata)
     
     N, M = EEGdata.shape
@@ -57,7 +80,12 @@ def FORCe(EEGdata, fs, electrodes):
     
     EEGdata = estimate_removed_channels(EEGdata, remCh, electrodes)
     
-    # TODO apply wavelet decomposition and ICA
+    ICs, mixMat, wavePacks = applyWaveletICA(EEGdata)
     
+    # TODO identify contaminated ICs for approximation coefficients
+    
+    # TODO soft thresholding on approximation and detail
+    
+    # TODO reconstruct EEG from wavelet decomposition
 
     return EEGdata
