@@ -8,10 +8,9 @@ Returns:
 """
 
 import numpy as np
-from pywt import wavedec, WaveletPacket
 
 from electrode_locations import electrode_locations
-from sobi import sobi_fast
+from decomposition import applyWaveletICA
 
 import pdb 
 
@@ -46,26 +45,7 @@ def estimate_removed_channels(EEGdata, remChs, electrodes):
         
     return EEGdata
 
-def applyWaveletICA(EEGdata):
-    """ apply wavelet decomposition and ICA to EEGdata """
-    terminal_nodes = ['aa','ad','da','dd'] # labels for level 2 nodes in WaveletPacket tree
-    T = len(terminal_nodes)
-    N, _ = EEGdata.shape # no. channels
-    
-    wavePacks = []
-    waveData = [[] for i in range(T)]
-    for c in range(N):
-        wavePacket = WaveletPacket(data=EEGdata[c,:], wavelet='sym4', maxlevel=2)
-        wavePacks.append(wavePacket)
-        for i,n in enumerate(terminal_nodes):
-            waveData[i].append(wavePacket[n].data)
-    
-    mixMat, V, X = sobi_fast(np.array(waveData[0]))
-    ICs = [np.matmul(np.transpose(V), X)]
-    
-    ICs += [np.array(wp) for wp in waveData[1:]]
-    
-    return ICs, mixMat, wavePacks
+
 
 def FORCe(EEGdata, fs, electrodes):
     """ Run FORCe on EEGdata """

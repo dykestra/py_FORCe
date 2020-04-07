@@ -1,22 +1,24 @@
-""" Second Order Blind Identification (SOBI) 
-Equivalent of sobi_FAST.m from original Matlab with ntrials=1
-
-X = H * Sources
-ICs = V * X
-
-Input:
-    - X : input data (channels, samples)
-Returns:
-    - H : estimated mixing matrix (channels, channels)
-    - V : inverse mixing matrix (channels, channels)
-    - X : processed input data (channels, samples)
+""" Wavelet and ICA decomposition using Second Order Blind Identification (SOBI) 
+    - Equivalent of sobi_FAST.m from original Matlab with ntrials=1
 """
 import numpy as np 
+from pywt import wavedec, WaveletPacket
+from numpy.linalg import svd, pinv, norm, eig
 
 import pdb
 
 def sobi_fast(X):
-    """ apply sobi to X """
+    """ Apply SOBI
+    
+        X = H * Sources
+        ICs = V * X
+    Input:
+        - X : input data (channels, samples)
+    Returns:
+        - H : estimated mixing matrix (channels, channels)
+        - V : inverse mixing matrix (channels, channels)
+        - X : processed input data (channels, samples)
+    """
     DEFAULT_LAGS = 100
     m, N = X.shape
     
@@ -78,3 +80,24 @@ def sobi_fast(X):
     H = np.matmul( np.linalg.pinv(Q), V )
 
     return H, V, X
+
+def applyWaveletICA(EEGdata):
+    """ apply wavelet decomposition and ICA to EEGdata """
+    terminal_nodes = ['aa','ad','da','dd'] # labels for level 2 nodes in WaveletPacket tree
+    T = len(terminal_nodes)
+    N, _ = EEGdata.shape # no. channels
+    
+    wavePacks = []
+    waveData = [[] for i in range(T)]
+    for c in range(N):
+        wavePacket = WaveletPacket(data=EEGdata[c,:], wavelet='sym4', maxlevel=2)
+        wavePacks.append(wavePacket)
+        for i,n in enumerate(terminal_nodes):
+            waveData[i].append(wavePacket[n].data)
+    
+    mixMat, V, X = sobi_fast(np.array(waveData[0]))
+    ICs = [np.matmul(np.transpose(V), X)]
+    
+    ICs += [np.array(wp) for wp in waveData[1:]]
+    
+    return ICs, mixMat, wavePacks, terminal_nodes
