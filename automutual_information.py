@@ -60,7 +60,6 @@ def extractFeaturesMultiChsWaveAMI(signalSet, Fs):
         for chNo in range(signalSet.shape[0]):
             for j in range(len(lags)):
                 AMIs[chNo,j] = mi( signalSet[chNo, :endP-lags[j]-1], signalSet[chNo, 1+lags[j]:endP] )
-                print('chNo: {}, j: {}'.format(chNo,j))
         features[lagNo] = max(np.mean(AMIs,1))
     
     return features
