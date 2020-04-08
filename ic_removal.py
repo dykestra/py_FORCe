@@ -6,12 +6,14 @@ from scipy.stats import kurtosis
 
 from automutual_information import extractFeaturesMultiChsWaveAMI
 
+import pdb
+
 def powerspectrum(data, Fs):
     """ compute power spectrum of data """
     L = data.shape[0]
     NFFT = 2**np.ceil(np.log2(L)) 
     Y = fft(data, int(NFFT)) / L
-    f = Fs/2*np.linspace(0,1,NFFT/2)
+    f = Fs/2*np.linspace(0,1,int(NFFT/2))
     power = 2 * abs(Y[:int(NFFT/2)])
     p = np.array([f,power])
     return p
@@ -54,7 +56,7 @@ def remove_contaminated(ICs, mixMat, electrodes, fs):
 
         # get kurtosis value
         entropy.append(np.mean( kurtosis( np.transpose(projIC[iNo]), fisher=False ) ))
-        
+
         # power spectrum
         specDistT = []
         gammaPSDT = []
@@ -85,7 +87,7 @@ def remove_contaminated(ICs, mixMat, electrodes, fs):
         frontChans = [i for i,c in enumerate(electrodes) if 'F' in c]
         otherChans = [i for i,c, in enumerate(electrodes) if not 'F' in c]
         stdRatio.append(np.mean([stdProjT[i] for i in frontChans]) / np.mean([stdProjT[i] for i in otherChans]))
-    
+        
         # get AMI
         featsClust.append( extractFeaturesMultiChsWaveAMI(projIC[iNo],fs) )
         
