@@ -8,6 +8,7 @@ Information about original Matlab code can be found [here](https://www.iandaly.o
 
 ## Dependencies
 - numpy
+- scipy
 - pywavelets v1.0.1
 
 ## How to Use
