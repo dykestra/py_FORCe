@@ -13,6 +13,7 @@ import numpy as np
 from channel_threshold import channel_threshold
 from decomposition import applyWaveletICA
 from ic_removal import remove_contaminated
+from spike_zone_thresholding import apply_soft_threshold
 
 
 import pdb 
@@ -39,7 +40,7 @@ def FORCe(EEGdata, fs, electrodes):
     newSigNode = ICs.copy()
     newSigNode[0] = np.matmul(mixMat, ICs[0])
 
-    # TODO soft thresholding on approximation and detail
+    newSigNode = apply_soft_threshold(newSigNode, tNodes)
     
     # TODO reconstruct EEG from wavelet decomposition
 
