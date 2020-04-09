@@ -62,13 +62,12 @@ def remove_contaminated(ICs, mixMat, electrodes, fs):
         gammaPSDT = []
         for pNo in range(projIC[iNo].shape[0]):
             psT = powerspectrum( projIC[iNo][pNo,:], fs )
-            idealDistro = np.vstack((psT[0,:], 1./psT[0,:]))
-            idealDistro[1,0] = 0 # remove inf val for 1/0
+            idealDistro = np.vstack((psT[0,1:], 1./psT[0,1:]))
             # normalise
-            idealDistro[1,1:] = idealDistro[1,1:] / max(idealDistro[1,1:])
+            idealDistro[1,:] = idealDistro[1,:] / max(idealDistro[1,:])
             psCheck = psT[1,1:] / max(psT[1,1:])
             
-            diff = psCheck - idealDistro[1,1:]
+            diff = psCheck - idealDistro[1,:]
             specDistT.append( np.sqrt( np.matmul(diff, np.transpose(diff)) ) )
             gammaPSDT.append( np.mean( psT[1, np.where(psT[0,:] > 30)] ) )
             
