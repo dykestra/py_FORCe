@@ -1,23 +1,16 @@
 """ Extract features for Auto-Mutual Information """
 import numpy as np
 
-def minf(pab, papb):
-    eps = 1e-12
-    
-    wpab = np.where(pab > eps)
-    wpapb = np.where(papb > eps)
-    
-    n_wpab = wpab[0].shape[0]
-    n_wpapb = wpapb[0].shape[0]
-
+def minf(pab, papb, L):
+    eps = 1e-12    
     rows = []
     cols = []
-    for i in range(n_wpab):
-        for j in range(n_wpapb):
-            if (wpab[0][i] == wpapb[0][j]) and (wpab[1][i] == wpapb[1][j]): 
-                rows.append(wpab[0][i])
-                cols.append(wpab[1][i])
-    I = (np.array(rows), np.array(cols))
+    for i in range(L):
+        for j in range(L):
+            if pab[i,j] > eps and papb[i,j] > eps:
+                rows.append(i)
+                cols.append(j)
+    I = (np.array(rows), np.array(cols))            
     y = pab[I] * np.log2(pab[I] / papb[I]) # same values, different order from Matlab
     return y
 
@@ -46,7 +39,7 @@ def mi(A, B):
     n2 = hist2a(A,B,L)
     n2 = n2/np.sum(n2)
 
-    t = minf( n2, np.outer(na,nb) )
+    t = minf( n2, np.outer(na,nb), L )
     return sum(t)
 
 def extractFeaturesMultiChsWaveAMI(signalSet, Fs):
