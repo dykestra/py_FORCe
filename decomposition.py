@@ -1,5 +1,7 @@
 """ Wavelet and ICA decomposition using Second Order Blind Identification (SOBI) 
-    - Equivalent of sobi_FAST.m from original Matlab with ntrials=1
+    - sobi_fast() : Equivalent of sobi_FAST.m from original Matlab with ntrials=1
+    - apply_wavelet_ICA() : decompose EEG data into components
+    - reconstruct() : reconstruct the EEG data from components
 """
 import numpy as np 
 from pywt import wavedec, WaveletPacket
@@ -81,7 +83,7 @@ def sobi_fast(X):
 
     return H, V, X
 
-def applyWaveletICA(EEGdata):
+def apply_wavelet_ICA(EEGdata):
     """ apply wavelet decomposition and ICA to EEGdata """
     terminal_nodes = ['aa','ad','da','dd'] # labels for level 2 nodes in WaveletPacket tree
     T = len(terminal_nodes)
@@ -101,3 +103,18 @@ def applyWaveletICA(EEGdata):
     ICs += [np.array(wp) for wp in waveData[1:]]
     
     return ICs, mixMat, wavePacks, terminal_nodes
+
+def reconstruct(wavePacks, newSigNode, tNodes):
+    """ Reconstruct EEG data from wavePacks with updated data """
+    nC = len(wavePacks)
+    nT = len(tNodes)
+    for chNo in range(nC):
+        for tN in range(nT):
+            wavePacks[chNo][tNodes[tN]].data = newSigNode[tN][chNo]
+            
+    # reconstruct EEG from wavePacks
+    cleanEEG = []
+    for chNo in range(nC):
+        cleanEEG.append(wavePacks[chNo].reconstruct())
+        
+    return np.array(cleanEEG)

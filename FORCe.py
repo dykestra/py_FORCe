@@ -11,7 +11,7 @@ import numpy as np
 
 
 from channel_threshold import channel_threshold
-from decomposition import applyWaveletICA
+from decomposition import apply_wavelet_ICA, reconstruct
 from ic_removal import remove_contaminated
 from spike_zone_thresholding import apply_soft_threshold
 
@@ -29,11 +29,9 @@ def FORCe(EEGdata, fs, electrodes):
     """ Run FORCe on EEGdata """
     check_valid(EEGdata)
     
-    N, M = EEGdata.shape
-    
     EEGdata = channel_threshold(EEGdata, electrodes)
     
-    ICs, mixMat, wavePacks, tNodes = applyWaveletICA(EEGdata)
+    ICs, mixMat, wavePacks, tNodes = apply_wavelet_ICA(EEGdata)
     
     ICs = remove_contaminated(ICs, mixMat, electrodes, fs)
     
@@ -42,6 +40,6 @@ def FORCe(EEGdata, fs, electrodes):
 
     newSigNode = apply_soft_threshold(newSigNode, tNodes)
     
-    # TODO reconstruct EEG from wavelet decomposition
+    cleanEEG = reconstruct(wavePacks, newSigNode, tNodes)
 
-    return EEGdata
+    return cleanEEG
