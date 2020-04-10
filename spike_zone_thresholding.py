@@ -1,10 +1,12 @@
 """ Spike Zone Thresholding for both approximation and detail coefficients """
 import numpy as np 
 
+from constants import WEIGHT_APPROX, WEIGHT_DETAIL, GAIN_APPROX, GAIN_DETAIL
+
 def apply_soft_threshold(newSigNode, tNodes):
     for tN in range(len(tNodes)):
-        adjustVal = 0.8 if tN == 0 else 0.07
-        checkVal = 0.7 if tN == 0 else 0.2
+        adjustVal = GAIN_APPROX if tN == 0 else GAIN_DETAIL
+        checkVal = WEIGHT_APPROX if tN == 0 else WEIGHT_DETAIL
             
         spikePos = []
         coefVar = []

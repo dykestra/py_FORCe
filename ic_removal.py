@@ -5,6 +5,7 @@ from numpy.fft import fft
 from scipy.stats import kurtosis
 
 from automutual_information import extractFeaturesMultiChsWaveAMI
+from constants import *
 
 import pdb
 
@@ -40,8 +41,8 @@ def projection_thresholds(projIC):
         p2p = []
         for pNo in range(projIC[iNo].shape[0]):
             signal = projIC[iNo][pNo,:]
-            pthresh.append( min(signal) < -100 or max(signal) > 100 )
-            p2p.append( max(signal) - min(signal) > 60 )
+            pthresh.append( min(signal) < PROJECTION_MIN or max(signal) > PROJECTION_MAX )
+            p2p.append( max(signal) - min(signal) > P2P_MAX )
 
         if any(pthresh): remICsPT.append(iNo)
         if any(p2p): remICsP2P.append(iNo)
@@ -52,7 +53,7 @@ def kurtosis_threshold(projIC):
     entropy = [np.mean( kurtosis( np.transpose(proj), fisher=False ) ) for proj in projIC]
     mu_e = np.mean(entropy)
     sig_e = stdm(entropy)
-    remICsKurt = [i for i,e in enumerate(entropy) if e > mu_e + (0.5*sig_e) or e < mu_e - (0.5*sig_e)]      
+    remICsKurt = [i for i,e in enumerate(entropy) if e > mu_e + (KURTOSIS_FACTOR*sig_e) or e < mu_e - (KURTOSIS_FACTOR*sig_e)]      
     return remICsKurt
     
 def power_spectrum_thresholds(projIC, fs):
@@ -75,9 +76,9 @@ def power_spectrum_thresholds(projIC, fs):
         gammaPSD.append(max(gammaPSDT))
 
     # psd distance from 1/F distribution threshold
-    remICsSpecDist = [i for i,s in enumerate(specDist) if s > 3.5]     
+    remICsSpecDist = [i for i,s in enumerate(specDist) if s > SPEC_DIST_MAX]     
     # gamma psd threshold
-    remICsGamma = [i for i,g in enumerate(gammaPSD) if g > 1.7]
+    remICsGamma = [i for i,g in enumerate(gammaPSD) if g > GAMMA_MAX]
     
     return remICsSpecDist, remICsGamma
 
@@ -89,7 +90,7 @@ def power_spectrum_ratio_threshold(ICs, fs):
         muHigh = np.mean(ps[1, np.where(ps[0,:]>20)])
         specRatio.append( muHigh / muLow )
 
-    remICsSpecRatio = [i for i,r in enumerate(specRatio) if r > 1.0]
+    remICsSpecRatio = [i for i,r in enumerate(specRatio) if r > SPEC_RATIO_MAX]
     return remICsSpecRatio
  
 def std_thresholds(projIC, electrodes):
@@ -104,15 +105,15 @@ def std_thresholds(projIC, electrodes):
         stdRatio.append(np.mean([stdProjT[i] for i in frontChans]) / np.mean([stdProjT[i] for i in otherChans]))      
     
     # std threshold
-    remICsStd = [i for i,s in enumerate(stdProj) if s > np.mean(stdProj) + 2*stdm(stdProj)]
+    remICsStd = [i for i,s in enumerate(stdProj) if s > np.mean(stdProj) + STD_FACTOR * stdm(stdProj)]
     # std ratio threshold
-    remICsStdRatio = [i for i,s in enumerate(stdRatio) if s > np.mean(stdRatio + stdm(stdRatio))] 
+    remICsStdRatio = [i for i,s in enumerate(stdRatio) if s > np.mean(stdRatio + STD_RATIO_FACTOR * stdm(stdRatio))] 
     
     return remICsStd, remICsStdRatio
 
 def automutual_information_threshold(projIC, fs):               
     featsClust = [extractFeaturesMultiChsWaveAMI(proj,fs) for proj in projIC]
-    remICsAMI = [i for i,f in enumerate(featsClust) if f < 2.0 or f > 3.0]
+    remICsAMI = [i for i,f in enumerate(featsClust) if f < AMI_MIN or f > AMI_MAX]
     return remICsAMI
     
 def projection_spiking_threshold(projIC):
@@ -133,13 +134,13 @@ def projection_spiking_threshold(projIC):
         T = 0.1 * (np.mean(coefVar) + stdm(coefVar))
         noSpikes.append(len([c for c in coefVar if c > T]) / len(coefVar))
         
-    remICsNoSpikes = [i for i,n in enumerate(noSpikes) if n >= 0.25]
+    remICsNoSpikes = [i for i,n in enumerate(noSpikes) if n >= PROJECTION_SPIKE_THRESH]
     return remICsNoSpikes
 
 def IC_spiking_threshold(ICs):
     remICsSpike = []
     for iNo in range(ICs.shape[0]):
-        if max(abs(ICs[iNo,:])) > np.mean(abs(ICs[iNo,:])) + 3*stdm(ICs[iNo,:]):
+        if max(abs(ICs[iNo,:])) > np.mean(abs(ICs[iNo,:])) + IC_SPIKE_FACTOR * stdm(ICs[iNo,:]):
             remICsSpike.append(iNo)
     return remICsSpike
 

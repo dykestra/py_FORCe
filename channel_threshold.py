@@ -1,6 +1,7 @@
 """ Functions to perform channel threshold and interpolate signal for removed channels """
 import numpy as np
 from electrode_locations import electrode_locations
+from constants import CHANNEL_THRESH
 
 def get_electrode_locations(electrodes):
     """ get relevant electrode locations """
@@ -27,10 +28,10 @@ def estimate_removed_channels(EEGdata, remChs, electrodes):
     return EEGdata
 
 def channel_threshold(EEGdata, electrodes):
-    """ perform channel threshold 200uV """
-    remCh = [i for i,c in enumerate(EEGdata) if np.max(c) > 200 ]
+    """ perform channel threshold """
+    remCh = [i for i,c in enumerate(EEGdata) if np.max(c) > CHANNEL_THRESH ]
     if len(remCh) == EEGdata.shape[0]: 
-        raise Exception('All channels > 200uV')
+        raise Exception('All channels > {}uV'.format(CHANNEL_THRESH))
     
     EEGdata = estimate_removed_channels(EEGdata, remCh, electrodes)
     return EEGdata
