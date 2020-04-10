@@ -18,32 +18,24 @@ def powerspectrum(data, Fs):
     p = np.array([f,power])
     return p
 
-def remove_contaminated(ICs, mixMat, electrodes, fs):
-    tN = 0 # approximation coefficients only
-    
-    remICsPT = [] # projection threshold
-    remICsP2P = [] # peak-to-peak
-    remICsSpike = [] # spikedness of ICs
-    
+def stdm(X):
+    """ equivalent of Matlab std() """
+    return np.std(X, ddof=1)
+
+def estimate_scalp_projections(ICs, mixMat):
     projIC = []
-    entropy = []
-    specDist = []
-    gammaPSD = []
-    specRatio = []
-    stdProj = []
-    stdRatio = []
-    featsClust = []
-    noSpikes = []
-    for iNo in range(ICs[tN].shape[0]):
-        
-        # estimate scalp projections
-        ICtemp = ICs[tN].copy()
+    for iNo in range(ICs.shape[0]):
+        ICtemp = ICs.copy()
         for iT in range(ICtemp.shape[0]):
             if iT != iNo:
                 ICtemp[iT,:] = np.zeros((1,ICtemp.shape[1]))
         projIC.append( np.matmul( mixMat, ICtemp ) )
+    return projIC
 
-        # projection thresholds
+def projection_thresholds(projIC):
+    remICsPT = []
+    remICsP2P = []
+    for iNo in range(len(projIC)):
         pthresh = []
         p2p = []
         for pNo in range(projIC[iNo].shape[0]):
@@ -53,11 +45,20 @@ def remove_contaminated(ICs, mixMat, electrodes, fs):
 
         if any(pthresh): remICsPT.append(iNo)
         if any(p2p): remICsP2P.append(iNo)
+        
+    return remICsPT, remICsP2P
 
-        # get kurtosis value
-        entropy.append(np.mean( kurtosis( np.transpose(projIC[iNo]), fisher=False ) ))
-
-        # power spectrum
+def kurtosis_threshold(projIC):
+    entropy = [np.mean( kurtosis( np.transpose(proj), fisher=False ) ) for proj in projIC]
+    mu_e = np.mean(entropy)
+    sig_e = stdm(entropy)
+    remICsKurt = [i for i,e in enumerate(entropy) if e > mu_e + (0.5*sig_e) or e < mu_e - (0.5*sig_e)]      
+    return remICsKurt
+    
+def power_spectrum_thresholds(projIC, fs):
+    specDist = []
+    gammaPSD = []
+    for iNo in range(len(projIC)):
         specDistT = []
         gammaPSDT = []
         for pNo in range(projIC[iNo].shape[0]):
@@ -70,26 +71,54 @@ def remove_contaminated(ICs, mixMat, electrodes, fs):
             diff = psCheck - idealDistro[1,:]
             specDistT.append( np.sqrt( np.matmul(diff, np.transpose(diff)) ) )
             gammaPSDT.append( np.mean( psT[1, np.where(psT[0,:] > 30)] ) )
-            
         specDist.append(np.mean(specDistT))
         gammaPSD.append(max(gammaPSDT))
 
-        # power spectrum ratio
-        ps = powerspectrum(ICs[tN][iNo,:], fs)
+    # psd distance from 1/F distribution threshold
+    remICsSpecDist = [i for i,s in enumerate(specDist) if s > 3.5]     
+    # gamma psd threshold
+    remICsGamma = [i for i,g in enumerate(gammaPSD) if g > 1.7]
+    
+    return remICsSpecDist, remICsGamma
+
+def power_spectrum_ratio_threshold(ICs, fs):
+    specRatio = []
+    for iNo in range(ICs.shape[0]):
+        ps = powerspectrum(ICs[iNo,:], fs)
         muLow = np.mean(ps[1, np.where(ps[0,:]<20)])
         muHigh = np.mean(ps[1, np.where(ps[0,:]>20)])
         specRatio.append( muHigh / muLow )
 
-        # std and std ratio
-        stdProjT = [np.std(signal,ddof=1) for signal in projIC[iNo]]
+    remICsSpecRatio = [i for i,r in enumerate(specRatio) if r > 1.0]
+    return remICsSpecRatio
+ 
+def std_thresholds(projIC, electrodes):
+    frontChans = [i for i,c in enumerate(electrodes) if 'F' in c]
+    otherChans = [i for i,c, in enumerate(electrodes) if not 'F' in c]
+    stdProj = []
+    stdRatio = []
+    for iNo in range(len(projIC)):
+        stdProjT = [stdm(signal) for signal in projIC[iNo]]
         stdProj.append(max(stdProjT))
-        frontChans = [i for i,c in enumerate(electrodes) if 'F' in c]
-        otherChans = [i for i,c, in enumerate(electrodes) if not 'F' in c]
-        stdRatio.append(np.mean([stdProjT[i] for i in frontChans]) / np.mean([stdProjT[i] for i in otherChans]))
-        
-        # get AMI
-        featsClust.append( extractFeaturesMultiChsWaveAMI(projIC[iNo],fs) )
-        
+
+        stdRatio.append(np.mean([stdProjT[i] for i in frontChans]) / np.mean([stdProjT[i] for i in otherChans]))      
+    
+    # std threshold
+    remICsStd = [i for i,s in enumerate(stdProj) if s > np.mean(stdProj) + 2*stdm(stdProj)]
+    # std ratio threshold
+    remICsStdRatio = [i for i,s in enumerate(stdRatio) if s > np.mean(stdRatio + stdm(stdRatio))] 
+    
+    return remICsStd, remICsStdRatio
+
+def automutual_information_threshold(projIC, fs):               
+    featsClust = [extractFeaturesMultiChsWaveAMI(proj,fs) for proj in projIC]
+    remICsAMI = [i for i,f in enumerate(featsClust) if f < 2.0 or f > 3.0]
+    return remICsAMI
+    
+def projection_spiking_threshold(projIC):
+    noSpikes = []
+    tN = 0
+    for iNo in range(len(projIC)):
         # find spike zones in projection
         muSig = abs(np.mean(projIC[tN], 0)) # mean signal across channels
         A1 = np.where(muSig[1:-1] > muSig[2:])[0] + 1
@@ -97,47 +126,42 @@ def remove_contaminated(ICs, mixMat, electrodes, fs):
         # calculate coefficients
         coefVar = np.zeros(len(spikePos))
         for i in range(len(spikePos)):
-            sig_spike = np.std(abs(np.mean(projIC[tN][:,spikePos[i]-1:spikePos[i]+2],0)),ddof=1)
+            sig_spike = stdm(abs(np.mean(projIC[tN][:,spikePos[i]-1:spikePos[i]+2],0)))
             mu_spike = np.mean(abs(np.mean(projIC[tN][iNo,spikePos[i]-1:spikePos[i]+2],0)))
             coefVar[i] = sig_spike / mu_spike
         # soft thresholding
-        T = 0.1 * (np.mean(coefVar) + np.std(coefVar,ddof=1))
+        T = 0.1 * (np.mean(coefVar) + stdm(coefVar))
         noSpikes.append(len([c for c in coefVar if c > T]) / len(coefVar))
         
-        # spikedness of ICs
-        if max(abs(ICs[tN][iNo,:])) > np.mean(abs(ICs[tN][iNo,:])) + 3*np.std(ICs[tN][iNo,:],ddof=1):
-            remICsSpike.append(iNo)
-
-    # kurtosis threshold
-    mu_e = np.mean(entropy)
-    sig_e = np.std(entropy,ddof=1)
-    remICsKurt = [i for i,e in enumerate(entropy) if e > mu_e + (0.5*sig_e) or e < mu_e - (0.5*sig_e)]      
-      
-    # psd distance from 1/F distribution threshold
-    remICsSpecDist = [i for i,s in enumerate(specDist) if s > 3.5]  
-       
-    # gamma psd threshold
-    remICsGamma = [i for i,g in enumerate(gammaPSD) if g > 1.7]
-    
-    # psd ratio threshold
-    remICsSpecRatio = [i for i,r in enumerate(specRatio) if r > 1.0]
-    
-    # std threshold
-    remICsStd = [i for i,s in enumerate(stdProj) if s > np.mean(stdProj) + 2*np.std(stdProj,ddof=1)]
-    
-    # std ratio threshold
-    remICsStdRatio = [i for i,s in enumerate(stdRatio) if s > np.mean(stdRatio + np.std(stdRatio,ddof=1))]
-    
-    # AMI threshold
-    remICsAMI = [i for i,f in enumerate(featsClust) if f < 2.0 or f > 3.0]
-            
-    # no. spikes threshold
     remICsNoSpikes = [i for i,n in enumerate(noSpikes) if n >= 0.25]
-            
-    # all ICs marked for removal by threshold
-    remICs_TOTAL = [remICsPT, remICsP2P, remICsSpike, remICsKurt, remICsSpecDist, remICsGamma, remICsSpecRatio, remICsStd, remICsStdRatio, remICsAMI, remICsNoSpikes]
+    return remICsNoSpikes
+
+def IC_spiking_threshold(ICs):
+    remICsSpike = []
+    for iNo in range(ICs.shape[0]):
+        if max(abs(ICs[iNo,:])) > np.mean(abs(ICs[iNo,:])) + 3*stdm(ICs[iNo,:]):
+            remICsSpike.append(iNo)
+    return remICsSpike
+
+def remove_contaminated(ICs, mixMat, electrodes, fs):
+    tN = 0 # approximation coefficients only
     
-    len_iNos = [len([r for r in remICs_TOTAL if iNo in r]) for iNo in range(ICs[tN].shape[0])] # number of thresholds each IC has exceeded
+    projIC = estimate_scalp_projections(ICs[tN], mixMat)
+    
+    remICsPT, remICsP2P = projection_thresholds(projIC)
+    remICsKurt = kurtosis_threshold(projIC)
+    remICsSpecDist, remICsGamma = power_spectrum_thresholds(projIC, fs)
+    remICsSpecRatio = power_spectrum_ratio_threshold(ICs[tN], fs)
+    remICsStd, remICsStdRatio = std_thresholds(projIC, electrodes)
+    remICsAMI = automutual_information_threshold(projIC, fs)
+    remICsNoSpikes = projection_spiking_threshold(projIC)
+    remICsSpike = IC_spiking_threshold(ICs[tN])
+     
+    # all ICs marked for removal
+    remICs_TOTAL = [remICsPT, remICsP2P, remICsSpike, remICsKurt, remICsSpecDist, remICsGamma,
+                     remICsSpecRatio, remICsStd, remICsStdRatio, remICsAMI, remICsNoSpikes]
+    # number of thresholds each IC has exceeded
+    len_iNos = [len([r for r in remICs_TOTAL if iNo in r]) for iNo in range(ICs[tN].shape[0])] 
     remICs = [i for i,l in enumerate(len_iNos) if l > 3] # ICs to remove
     
     if len(remICs) == ICs[tN].shape[0]:
